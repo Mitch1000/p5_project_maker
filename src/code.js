@@ -1,143 +1,185 @@
-export default function code(p5) {
-  const asciiToGreyScaleMap = '¶@ØÆMåBNÊßÔR#8Q&mÃ0À$GXZA5ñk2S%±3Fz¢yÝCJf1t7ªLc¿+?(r/¤²!*;"^:,\'.`       ';
-  const setPixel = (x, y) => {
-    const d = p5.pixelDensity();
-    let total = 0;
-    let totalR = 0;
-    let totalG = 0;
-    let totalB = 0;
+import P5 from 'p5';
 
-    for (let i = 0; i < d; i += 1) {
-      for (let j = 0; j < d; j += 1) {
-        const index = 4 * ((y * d + j)
-          * p5.width * d + (x * d + i));
-        const r = p5.pixels[index];
-        const g = p5.pixels[index + 1];
-        const b = p5.pixels[index + 2];
-        const a = p5.pixels[index + 3];
+let leftAnimating = false;
+let rightAnimating = false;
+const vScale = 8;
+let splashModifier = 1;
 
-        totalR += r;
-        totalG += g;
-        totalB += b;
 
-        total += Math
-          .floor(((r + g + b) / 3) * (a / 255));
+
+function overlay(p5) {
+  return {
+    setup() {
+      p5.createCanvas(window.innerWidth, window.innerHeight);
+      p5.pixelDensity(1);
+    },
+
+    draw() {
+      if (leftAnimating) {
+        const w = p5.map(bright, 0, 255, 0, vScale) * splashModifier;
+        p5.rect(x * vScale, y * vScale, w, w, w / 3);
       }
-    }
-
-    const average = total / (d * d);
-    const averageR = totalR / (d * d);
-    const averageG = totalG / (d * d);
-    const averageB = totalB / (d * d);
-
-    const { length } = asciiToGreyScaleMap;
-    const letterIndex = Math
-      .floor((length / 255) * average);
-
-    p5.colorMode(p5.RGB);
-    const rgbColor = p5.color(averageR, averageG, averageB);
-
-    const hue = Math.round(p5.hue(rgbColor));
-    const possibleSaturation = Math.round(p5.saturation(rgbColor)) + 40;
-    const saturation = possibleSaturation < 100 ? possibleSaturation : 100;
-    const possibleLightness = Math.round(p5.lightness(rgbColor)) - 20;
-    const lightness = possibleLightness > 0 ? possibleLightness : 0;
-
-    p5.colorMode(p5.HSL);
-    const hslColor = p5.color(`hsl(${hue}, ${saturation}%, ${lightness}%)`);
-
-    return {
-      letter: asciiToGreyScaleMap[letterIndex],
-      color: hslColor,
-    };
+    },
   };
+}
 
-  const drawLinesInDiv = (lines) => {
-    const div = p5.createDiv();
-    div.style('font-size', '12pt');
-    div.style('font-family', 'Courier New');
-    div.style('font-weight', '600');
-    div.style('position', 'absolute');
-    div.style('top', '0');
-    div.style('left', '0');
-    div.style('scale', `${0.1385 * 2}`);
-    div.style('line-height', '0.6');
-    div.position(0, 0);
+function code(p5) {
+  // Daniel Shiffman
+  // https://youtu.be/rNqaw8LT2ZU
+  // http://thecodingtrain.com
 
-    const lineDiv = p5.createDiv(lines);
-    lineDiv.style('position', 'absolute');
-    div.child(lineDiv);
-    lineDiv.addClass('text-lines');
-  };
+  let video;
+  let videoArray = [];
+  let previousVideoArray = [];
+  let initialVideoArray = [];
 
-  const getLinesOfAscii = (img, fontSize = 4, draw = false) => {
-    let lines = '';
-    for (let h = 0; h < img.height; h += 1) {
-      let line = '';
-      for (let w = 0; w < img.width; w += 1) {
-        const pixel = setPixel(w, h);
-        line += pixel.letter;
-        if (draw) {
-          p5.fill(pixel.color);
-          const squishRatio = Math.floor(fontSize * 0.75);
-          p5.text(pixel.letter, w * squishRatio, h * squishRatio);
+  function handleLeft(bright, splashModifier, x, y) {
+    console.log('handleLeft');
+  }
+
+  function handleRight(bright, splashModifier, x, y) {
+    console.log('handleRight');
+    // const w = p5.map(bright, 0, 255, 0, vScale) * splashModifier;
+    // p5.rect(x * vScale, y * vScale, w, w, w / 3);
+  }
+
+  function drawRectPixel(pixel, index) {
+    const {
+      r,
+      g,
+      b,
+      y,
+      x,
+      bright,
+    } = pixel;
+
+    p5.noStroke();
+    const sideWidth = vScale * 1.2;
+    const sideHeight = vScale * 0.8;
+    const alpha = 0.7;
+
+    const getColor = ((c2, c1) => alpha * c1 + (1 - alpha) * c2);
+    let hasRightTriggered = false;
+    let hasLeftTriggered = false;
+    const splashDistance = 20;
+    if (y <= sideHeight || y >= video.width - sideHeight) {
+      const rr = getColor(r, 144);
+      const rg = getColor(g, 238);
+      const rb = getColor(b, 144);
+      // p5.fill(144, 238, 144);
+      p5.fill(rr, rg, rb);
+    } else if (x <= sideWidth || x >= video.width - sideWidth) {
+      const triggerThreshold = 16;
+      const prevBright = previousVideoArray[index].bright;
+      const hasBrightChanged = bright > prevBright + triggerThreshold
+        || bright < prevBright - triggerThreshold;
+      if (x <= sideWidth) {
+        if (!hasLeftTriggered && hasBrightChanged) {
+          handleLeft(bright, splashModifier, x, y);
+          // console.log(video.pixels[10]);
+          hasLeftTriggered = true;
+        }
+        if (hasLeftTriggered) {
+          splashModifier = splashDistance;
         }
       }
-      lines += (`${line}<br>`);
+
+      if (x >= (video.width - sideWidth)) {
+        if (!hasRightTriggered && hasBrightChanged) {
+          handleRight(bright, splashModifier, x, y);
+          hasRightTriggered = true;
+        }
+        if (hasRightTriggered) {
+          splashModifier = splashDistance;
+        }
+      }
+
+      const gr = getColor(r, 255);
+      const gg = getColor(g, 87);
+      const gb = getColor(b, 51);
+      p5.fill(gr, gg, gb);
+    } else {
+      // p5.fill(255, 246, 193);
+      p5.fill(r, g, b);
     }
 
-    return lines;
-  };
+    p5.rectMode(p5.CENTER);
+    const w = p5.map(bright, 0, 255, 0, vScale) * splashModifier;
+    p5.rect(x * vScale, y * vScale, w, w, w / 3);
+  }
 
-  const ascii = (img) => {
-    p5.loadFont('assets/SpaceMono-Regular.ttf', (spaceMono) => {
-      p5.textFont(spaceMono);
-      const fontSize = 4;
-      p5.textSize(fontSize);
-      getLinesOfAscii(img, fontSize, true);
-    });
-  };
+  function makeBrightnessMap() {
+    previousVideoArray = videoArray;
+    videoArray = [];
+    for (let y = 0; y < video.height; y += 1) {
+      for (let x = 0; x < video.width; x += 1) {
+        const index = (video.width - x - 1 + (y * video.width)) * 4;
 
-  const drawAsciiArt = (img) => {
-    const lines = getLinesOfAscii(img);
-    drawLinesInDiv(lines);
-  };
-
-  const setupImageResolution = (img) => {
-    const aspectRatio = img.width / img.height;
-    if (p5.width > 720) {
-      const newWidth = 720;
-      const newHeight = 720 / aspectRatio;
-      img.resize(newWidth, newHeight);
+        const r = video.pixels[index + 0];
+        const g = video.pixels[index + 1];
+        const b = video.pixels[index + 2];
+        const bright = (r + g + b) / 3;
+        videoArray.push({
+          value: video.pixels[index],
+          index,
+          x,
+          y,
+          r,
+          g,
+          b,
+          bright,
+        });
+      }
     }
 
-    if (p5.height > 480) {
-      const newHeight = 480;
-      const newWidth = 480 * aspectRatio;
-      img.resize(newWidth, newHeight);
+    if (previousVideoArray.length < videoArray.length) {
+      previousVideoArray = videoArray;
     }
+  }
+
+  function showPixels() {
+    p5.background(51);
+    for (let i = 0; i < videoArray.length; i += 1) {
+      const pixel = videoArray[i];
+      drawRectPixel(pixel, i);
+    }
+  }
+
+  window.setInitialArray = () => {
+    initialVideoArray = videoArray;
+    console.log(initialVideoArray);
+  };
+
+  window.logVideoArray = () => {
+    console.log(videoArray);
   };
 
   return {
     setup() {
-      const height = 1600;
-      const width = Math.floor(height * 1.33333333);
-      p5.createCanvas(width, height);
+      p5.createCanvas(window.innerWidth, window.innerHeight);
+      p5.pixelDensity(1);
+      video = p5.createCapture(p5.VIDEO);
+      video.size(p5.width / vScale, p5.height / vScale);
+      p5.background(51);
+      video.loadPixels();
+    },
 
-      p5.pixelDensity(6.0);
-
-      p5.loadImage('assets/devon.jpg', (img) => {
-        setupImageResolution(img);
-
-        // p5.resizeCanvas(img.width, img.height);
-        p5.image(img, 0, 0);
-        p5.loadPixels();
-
-        p5.background(255);
-
-        ascii(img);
-        // drawAsciiArt(img);
-      });
+    draw() {
+      video.loadPixels();
+      makeBrightnessMap();
+      showPixels();
     },
   };
 }
+
+function main() {
+  const canvas1 = (p5) => Object.assign(p5, code(p5));
+  // const canvas2 = (p5) => Object.assign(p5, overlay(p5));
+
+  return {
+    one: new P5(canvas1),
+ //   two: new P5(canvas2),
+  };
+}
+
+export default main;
